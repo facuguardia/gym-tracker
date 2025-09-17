@@ -1,18 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  LogOut, 
-  Dumbbell, 
+import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  LogOut,
+  Dumbbell,
   Calendar,
   Target,
-  Hash
-} from 'lucide-react';
+  Hash,
+  Copy,
+} from "lucide-react";
 
 interface Exercise {
   id: string;
@@ -48,21 +49,21 @@ export default function DashboardPage() {
   const [showAddExercise, setShowAddExercise] = useState<string | null>(null);
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editingExercise, setEditingExercise] = useState<string | null>(null);
-  const [newDayName, setNewDayName] = useState('');
+  const [newDayName, setNewDayName] = useState("");
   const [newExercise, setNewExercise] = useState({
-    name: '',
+    name: "",
     sets: 3,
-    reps: '12',
-    weight: 0
+    reps: "12",
+    weight: 0,
   });
-  const [editDayName, setEditDayName] = useState('');
+  const [editDayName, setEditDayName] = useState("");
   const [editExerciseData, setEditExerciseData] = useState({
-    name: '',
+    name: "",
     sets: 3,
-    reps: '12',
-    weight: 0
+    reps: "12",
+    weight: 0,
   });
-  
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -72,20 +73,22 @@ export default function DashboardPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/auth/login');
+        router.push("/auth/login");
         return;
       }
-      
+
       // Check if user profile exists, create if it doesn't
       await ensureUserProfile(user);
-      
+
       setUser(user);
       await fetchTrainingDays(user.id);
     } catch (error) {
-      console.error('Error checking user:', error);
-      router.push('/auth/login');
+      console.error("Error checking user:", error);
+      router.push("/auth/login");
     } finally {
       setLoading(false);
     }
@@ -93,44 +96,45 @@ export default function DashboardPage() {
 
   const ensureUserProfile = async (user: any) => {
     try {
-      console.log('Checking user profile for:', user.id);
-      console.log('User metadata:', user.user_metadata);
-      
+      console.log("Checking user profile for:", user.id);
+      console.log("User metadata:", user.user_metadata);
+
       // Check if profile exists
       const { data: existingProfile, error: checkError } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("id, username")
+        .eq("id", user.id)
         .single();
 
       // If profile doesn't exist, create it
-      if (checkError && checkError.code === 'PGRST116') {
-        console.log('Profile does not exist, creating new profile...');
-        const username = user.user_metadata?.username || user.user_metadata?.full_name || null;
-        
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            username: username
-          });
+      if (checkError && checkError.code === "PGRST116") {
+        console.log("Profile does not exist, creating new profile...");
+        const username =
+          user.user_metadata?.username || user.user_metadata?.full_name || null;
+
+        const { error: insertError } = await supabase.from("profiles").insert({
+          id: user.id,
+          email: user.email,
+          username: username,
+        });
 
         if (insertError) {
-          console.error('Error creating user profile:', insertError);
-          alert('Error al crear el perfil de usuario. Por favor, intenta de nuevo.');
+          console.error("Error creating user profile:", insertError);
+          alert(
+            "Error al crear el perfil de usuario. Por favor, intenta de nuevo."
+          );
           throw insertError;
         }
-        console.log('Profile created successfully');
+        console.log("Profile created successfully");
       } else if (checkError) {
-        console.error('Error checking user profile:', checkError);
-        alert('Error al verificar el perfil de usuario.');
+        console.error("Error checking user profile:", checkError);
+        alert("Error al verificar el perfil de usuario.");
         throw checkError;
       } else {
-        console.log('Profile exists:', existingProfile);
+        console.log("Profile exists:", existingProfile);
       }
     } catch (error) {
-      console.error('Error ensuring user profile:', error);
+      console.error("Error ensuring user profile:", error);
       throw error;
     }
   };
@@ -138,78 +142,129 @@ export default function DashboardPage() {
   const fetchTrainingDays = async (userId: string) => {
     try {
       const { data: days, error: daysError } = await supabase
-        .from('training_days')
-        .select('*')
-        .eq('user_id', userId)
-        .order('day_order');
+        .from("training_days")
+        .select("*")
+        .eq("user_id", userId)
+        .order("day_order");
 
       if (daysError) throw daysError;
 
       const daysWithExercises = await Promise.all(
         (days || []).map(async (day) => {
           const { data: exercises, error: exercisesError } = await supabase
-            .from('exercises')
-            .select('*')
-            .eq('day_id', day.id)
-            .order('order_index');
+            .from("exercises")
+            .select("*")
+            .eq("day_id", day.id)
+            .order("order_index");
 
           if (exercisesError) throw exercisesError;
 
           return {
             ...day,
-            exercises: exercises || []
+            exercises: exercises || [],
           };
         })
       );
 
       setTrainingDays(daysWithExercises);
     } catch (error) {
-      console.error('Error fetching training days:', error);
+      console.error("Error fetching training days:", error);
     }
   };
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      router.push('/');
+      router.push("/");
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error("Error logging out:", error);
+    }
+  };
+
+  const duplicateTrainingDay = async (dayId: string) => {
+    try {
+      // Encontrar el día que queremos duplicar
+      const dayToDuplicate = trainingDays.find((day) => day.id === dayId);
+      if (!dayToDuplicate || !user) return;
+
+      // Crear un nuevo día con nombre "Copia de [nombre original]"
+      const { data: newDay, error: dayError } = await supabase
+        .from("training_days")
+        .insert({
+          user_id: user.id,
+          day_name: `Copia de ${dayToDuplicate.day_name}`,
+          day_order: trainingDays.length,
+        })
+        .select()
+        .single();
+
+      if (dayError) throw dayError;
+
+      // Duplicar todos los ejercicios del día original
+      if (dayToDuplicate.exercises.length > 0) {
+        const exercisesToInsert = dayToDuplicate.exercises.map((exercise) => ({
+          day_id: newDay.id,
+          name: exercise.name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          weight: exercise.weight || 0,
+          order_index: exercise.order_index,
+        }));
+
+        const { data: newExercises, error: exercisesError } = await supabase
+          .from("exercises")
+          .insert(exercisesToInsert)
+          .select();
+
+        if (exercisesError) throw exercisesError;
+
+        // Actualizar el estado local con el nuevo día y sus ejercicios
+        setTrainingDays([
+          ...trainingDays,
+          { ...newDay, exercises: newExercises },
+        ]);
+      } else {
+        // Si no hay ejercicios, solo añadir el nuevo día
+        setTrainingDays([...trainingDays, { ...newDay, exercises: [] }]);
+      }
+    } catch (error) {
+      console.error("Error duplicating training day:", error);
     }
   };
 
   const addTrainingDay = async () => {
     if (!newDayName.trim() || !user) {
-      alert('Por favor, ingresa un nombre para el día de entrenamiento.');
+      alert("Por favor, ingresa un nombre para el día de entrenamiento.");
       return;
     }
 
     try {
-      console.log('Adding training day for user:', user.id);
-      console.log('Day name:', newDayName.trim());
-      
+      console.log("Adding training day for user:", user.id);
+      console.log("Day name:", newDayName.trim());
+
       const { data, error } = await supabase
-        .from('training_days')
+        .from("training_days")
         .insert({
           user_id: user.id,
           day_name: newDayName.trim(),
-          day_order: trainingDays.length
+          day_order: trainingDays.length,
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error adding training day:', error);
+        console.error("Error adding training day:", error);
         alert(`Error al agregar el día de entrenamiento: ${error.message}`);
         throw error;
       }
 
-      console.log('Training day added successfully:', data);
+      console.log("Training day added successfully:", data);
       setTrainingDays([...trainingDays, { ...data, exercises: [] }]);
-      setNewDayName('');
+      setNewDayName("");
       setShowAddDay(false);
-      alert('¡Día de entrenamiento agregado exitosamente!');
+      alert("¡Día de entrenamiento agregado exitosamente!");
     } catch (error) {
-      console.error('Error adding training day:', error);
+      console.error("Error adding training day:", error);
     }
   };
 
@@ -218,36 +273,43 @@ export default function DashboardPage() {
 
     try {
       const { error } = await supabase
-        .from('training_days')
+        .from("training_days")
         .update({ day_name: editDayName.trim() })
-        .eq('id', dayId);
+        .eq("id", dayId);
 
       if (error) throw error;
 
-      setTrainingDays(trainingDays.map(day => 
-        day.id === dayId ? { ...day, day_name: editDayName.trim() } : day
-      ));
+      setTrainingDays(
+        trainingDays.map((day) =>
+          day.id === dayId ? { ...day, day_name: editDayName.trim() } : day
+        )
+      );
       setEditingDay(null);
-      setEditDayName('');
+      setEditDayName("");
     } catch (error) {
-      console.error('Error updating training day:', error);
+      console.error("Error updating training day:", error);
     }
   };
 
   const deleteTrainingDay = async (dayId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este día de entrenamiento?')) return;
+    if (
+      !confirm(
+        "¿Estás seguro de que quieres eliminar este día de entrenamiento?"
+      )
+    )
+      return;
 
     try {
       const { error } = await supabase
-        .from('training_days')
+        .from("training_days")
         .delete()
-        .eq('id', dayId);
+        .eq("id", dayId);
 
       if (error) throw error;
 
-      setTrainingDays(trainingDays.filter(day => day.id !== dayId));
+      setTrainingDays(trainingDays.filter((day) => day.id !== dayId));
     } catch (error) {
-      console.error('Error deleting training day:', error);
+      console.error("Error deleting training day:", error);
     }
   };
 
@@ -255,16 +317,16 @@ export default function DashboardPage() {
     if (!newExercise.name.trim()) return;
 
     try {
-      const day = trainingDays.find(d => d.id === dayId);
+      const day = trainingDays.find((d) => d.id === dayId);
       const { data, error } = await supabase
-        .from('exercises')
+        .from("exercises")
         .insert({
           day_id: dayId,
           name: newExercise.name.trim(),
           sets: newExercise.sets,
           reps: newExercise.reps,
           weight: newExercise.weight,
-          order_index: day?.exercises.length || 0
+          order_index: day?.exercises.length || 0,
         })
         .select()
         .single();
@@ -274,27 +336,29 @@ export default function DashboardPage() {
       // Si hay un peso, guardarlo en progress_history
       if (newExercise.weight > 0 && data) {
         const { error: progressError } = await supabase
-          .from('progress_history')
+          .from("progress_history")
           .insert({
             exercise_id: data.id,
             weight: newExercise.weight,
-            notes: 'Peso inicial'
+            notes: "Peso inicial",
           });
-        
+
         if (progressError) {
-          console.error('Error guardando el peso:', progressError);
+          console.error("Error guardando el peso:", progressError);
         }
       }
 
-      setTrainingDays(trainingDays.map(day => 
-        day.id === dayId 
-          ? { ...day, exercises: [...day.exercises, data] }
-          : day
-      ));
-      setNewExercise({ name: '', sets: 3, reps: '12', weight: 0 });
+      setTrainingDays(
+        trainingDays.map((day) =>
+          day.id === dayId
+            ? { ...day, exercises: [...day.exercises, data] }
+            : day
+        )
+      );
+      setNewExercise({ name: "", sets: 3, reps: "12", weight: 0 });
       setShowAddExercise(null);
     } catch (error) {
-      console.error('Error adding exercise:', error);
+      console.error("Error adding exercise:", error);
     }
   };
 
@@ -303,69 +367,75 @@ export default function DashboardPage() {
 
     try {
       const { error } = await supabase
-        .from('exercises')
+        .from("exercises")
         .update({
           name: editExerciseData.name.trim(),
           sets: editExerciseData.sets,
           reps: editExerciseData.reps,
-          weight: editExerciseData.weight
+          weight: editExerciseData.weight,
         })
-        .eq('id', exerciseId);
+        .eq("id", exerciseId);
 
       if (error) throw error;
 
       // Si hay un peso, guardarlo en progress_history
       if (editExerciseData.weight > 0) {
         const { error: progressError } = await supabase
-          .from('progress_history')
+          .from("progress_history")
           .insert({
             exercise_id: exerciseId,
             weight: editExerciseData.weight,
-            notes: 'Actualización de peso'
+            notes: "Actualización de peso",
           });
-        
+
         if (progressError) {
-          console.error('Error guardando el peso:', progressError);
+          console.error("Error guardando el peso:", progressError);
         }
       }
 
-      setTrainingDays(trainingDays.map(day => 
-        day.id === dayId 
-          ? {
-              ...day, 
-              exercises: day.exercises.map(ex => 
-                ex.id === exerciseId 
-                  ? { ...ex, ...editExerciseData }
-                  : ex
-              )
-            }
-          : day
-      ));
+      setTrainingDays(
+        trainingDays.map((day) =>
+          day.id === dayId
+            ? {
+                ...day,
+                exercises: day.exercises.map((ex) =>
+                  ex.id === exerciseId ? { ...ex, ...editExerciseData } : ex
+                ),
+              }
+            : day
+        )
+      );
       setEditingExercise(null);
-      setEditExerciseData({ name: '', sets: 3, reps: '12', weight: 0 });
+      setEditExerciseData({ name: "", sets: 3, reps: "12", weight: 0 });
     } catch (error) {
-      console.error('Error updating exercise:', error);
+      console.error("Error updating exercise:", error);
     }
   };
 
   const deleteExercise = async (exerciseId: string, dayId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) return;
+    if (!confirm("¿Estás seguro de que quieres eliminar este ejercicio?"))
+      return;
 
     try {
       const { error } = await supabase
-        .from('exercises')
+        .from("exercises")
         .delete()
-        .eq('id', exerciseId);
+        .eq("id", exerciseId);
 
       if (error) throw error;
 
-      setTrainingDays(trainingDays.map(day => 
-        day.id === dayId 
-          ? { ...day, exercises: day.exercises.filter(ex => ex.id !== exerciseId) }
-          : day
-      ));
+      setTrainingDays(
+        trainingDays.map((day) =>
+          day.id === dayId
+            ? {
+                ...day,
+                exercises: day.exercises.filter((ex) => ex.id !== exerciseId),
+              }
+            : day
+        )
+      );
     } catch (error) {
-      console.error('Error deleting exercise:', error);
+      console.error("Error deleting exercise:", error);
     }
   };
 
@@ -392,7 +462,11 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                Hola, {user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'}
+                Hola,{" "}
+                {user?.user_metadata?.username ||
+                  user?.user_metadata?.full_name ||
+                  user?.email?.split("@")[0] ||
+                  "Usuario"}
               </span>
               <button
                 onClick={handleLogout}
@@ -410,8 +484,12 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Mi Rutina de Entrenamiento</h2>
-            <p className="text-gray-600 mt-1">Gestiona tus días de entrenamiento y ejercicios</p>
+            <h2 className="text-3xl font-bold text-gray-900">
+              Mi Rutina de Entrenamiento
+            </h2>
+            <p className="text-gray-600 mt-1">
+              Gestiona tus días de entrenamiento y ejercicios
+            </p>
           </div>
           <button
             onClick={() => setShowAddDay(true)}
@@ -425,7 +503,9 @@ export default function DashboardPage() {
         {/* Add Day Form */}
         {showAddDay && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Agregar Nuevo Día de Entrenamiento</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Agregar Nuevo Día de Entrenamiento
+            </h3>
             <div className="flex gap-4">
               <input
                 type="text"
@@ -433,7 +513,7 @@ export default function DashboardPage() {
                 onChange={(e) => setNewDayName(e.target.value)}
                 placeholder="Nombre del día (ej: Pecho y Tríceps)"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyPress={(e) => e.key === 'Enter' && addTrainingDay()}
+                onKeyPress={(e) => e.key === "Enter" && addTrainingDay()}
               />
               <button
                 onClick={addTrainingDay}
@@ -444,7 +524,7 @@ export default function DashboardPage() {
               <button
                 onClick={() => {
                   setShowAddDay(false);
-                  setNewDayName('');
+                  setNewDayName("");
                 }}
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
               >
@@ -474,7 +554,10 @@ export default function DashboardPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {trainingDays.map((day) => (
-              <div key={day.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div
+                key={day.id}
+                className="bg-white rounded-lg shadow-md overflow-hidden"
+              >
                 {/* Day Header */}
                 <div className="bg-blue-50 px-6 py-4 border-b">
                   {editingDay === day.id ? (
@@ -484,7 +567,9 @@ export default function DashboardPage() {
                         value={editDayName}
                         onChange={(e) => setEditDayName(e.target.value)}
                         className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                        onKeyPress={(e) => e.key === 'Enter' && updateTrainingDay(day.id)}
+                        onKeyPress={(e) =>
+                          e.key === "Enter" && updateTrainingDay(day.id)
+                        }
                       />
                       <button
                         onClick={() => updateTrainingDay(day.id)}
@@ -495,7 +580,7 @@ export default function DashboardPage() {
                       <button
                         onClick={() => {
                           setEditingDay(null);
-                          setEditDayName('');
+                          setEditDayName("");
                         }}
                         className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
                       >
@@ -504,8 +589,17 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-900">{day.day_name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {day.day_name}
+                      </h3>
                       <div className="flex gap-1">
+                        <button
+                          onClick={() => duplicateTrainingDay(day.id)}
+                          className="p-1 text-gray-500 hover:text-green-600 transition-colors"
+                          title="Duplicar día"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => {
                             setEditingDay(day.id);
@@ -529,51 +623,91 @@ export default function DashboardPage() {
                 {/* Exercises */}
                 <div className="p-6">
                   {day.exercises.length === 0 ? (
-                    <p className="text-gray-500 text-sm mb-4">No hay ejercicios aún</p>
+                    <p className="text-gray-500 text-sm mb-4">
+                      No hay ejercicios aún
+                    </p>
                   ) : (
                     <div className="space-y-3 mb-4">
                       {day.exercises.map((exercise) => (
-                        <div key={exercise.id} className="border border-gray-200 rounded-lg p-3">
+                        <div
+                          key={exercise.id}
+                          className="border border-gray-200 rounded-lg p-3"
+                        >
                           {editingExercise === exercise.id ? (
                             <div className="space-y-2">
                               <input
                                 type="text"
                                 value={editExerciseData.name}
-                                onChange={(e) => setEditExerciseData({...editExerciseData, name: e.target.value})}
+                                onChange={(e) =>
+                                  setEditExerciseData({
+                                    ...editExerciseData,
+                                    name: e.target.value,
+                                  })
+                                }
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                 placeholder="Nombre del ejercicio"
                               />
                               <div className="flex gap-2">
                                 <div className="flex flex-col w-1/3">
-                                  <label htmlFor="edit-sets" className="text-xs text-gray-500 mb-1">Sets</label>
+                                  <label
+                                    htmlFor="edit-sets"
+                                    className="text-xs text-gray-500 mb-1"
+                                  >
+                                    Sets
+                                  </label>
                                   <input
                                     id="edit-sets"
                                     type="number"
                                     value={editExerciseData.sets}
-                                    onChange={(e) => setEditExerciseData({...editExerciseData, sets: parseInt(e.target.value) || 0})}
+                                    onChange={(e) =>
+                                      setEditExerciseData({
+                                        ...editExerciseData,
+                                        sets: parseInt(e.target.value) || 0,
+                                      })
+                                    }
                                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                     placeholder="Sets"
                                     min="1"
                                   />
                                 </div>
                                 <div className="flex flex-col w-1/3">
-                                  <label htmlFor="edit-reps" className="text-xs text-gray-500 mb-1">Reps</label>
+                                  <label
+                                    htmlFor="edit-reps"
+                                    className="text-xs text-gray-500 mb-1"
+                                  >
+                                    Reps
+                                  </label>
                                   <input
                                     id="edit-reps"
                                     type="text"
                                     value={editExerciseData.reps}
-                                    onChange={(e) => setEditExerciseData({...editExerciseData, reps: e.target.value})}
+                                    onChange={(e) =>
+                                      setEditExerciseData({
+                                        ...editExerciseData,
+                                        reps: e.target.value,
+                                      })
+                                    }
                                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                     placeholder="Reps"
                                   />
                                 </div>
                                 <div className="flex flex-col w-1/3">
-                                  <label htmlFor="edit-weight" className="text-xs text-gray-500 mb-1">Peso (kg)</label>
+                                  <label
+                                    htmlFor="edit-weight"
+                                    className="text-xs text-gray-500 mb-1"
+                                  >
+                                    Peso (kg)
+                                  </label>
                                   <input
                                     id="edit-weight"
                                     type="number"
                                     value={editExerciseData.weight}
-                                    onChange={(e) => setEditExerciseData({...editExerciseData, weight: parseFloat(e.target.value) || 0})}
+                                    onChange={(e) =>
+                                      setEditExerciseData({
+                                        ...editExerciseData,
+                                        weight: parseFloat(e.target.value) || 0,
+                                      })
+                                    }
                                     className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                                     placeholder="Peso"
                                     min="0"
@@ -583,7 +717,9 @@ export default function DashboardPage() {
                               </div>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => updateExercise(exercise.id, day.id)}
+                                  onClick={() =>
+                                    updateExercise(exercise.id, day.id)
+                                  }
                                   className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                                 >
                                   Guardar
@@ -591,7 +727,12 @@ export default function DashboardPage() {
                                 <button
                                   onClick={() => {
                                     setEditingExercise(null);
-                                    setEditExerciseData({ name: '', sets: 3, reps: '12', weight: 0 });
+                                    setEditExerciseData({
+                                      name: "",
+                                      sets: 3,
+                                      reps: "12",
+                                      weight: 0,
+                                    });
                                   }}
                                   className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
                                 >
@@ -602,7 +743,9 @@ export default function DashboardPage() {
                           ) : (
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{exercise.name}</h4>
+                                <h4 className="font-medium text-gray-900">
+                                  {exercise.name}
+                                </h4>
                                 <div className="flex items-center text-sm text-gray-600 mt-1">
                                   <Hash className="h-3 w-3 mr-1" />
                                   <span>{exercise.sets} sets</span>
@@ -624,7 +767,7 @@ export default function DashboardPage() {
                                       name: exercise.name,
                                       sets: exercise.sets,
                                       reps: exercise.reps,
-                                      weight: exercise.weight || 0
+                                      weight: exercise.weight || 0,
                                     });
                                   }}
                                   className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
@@ -632,7 +775,9 @@ export default function DashboardPage() {
                                   <Edit className="h-3 w-3" />
                                 </button>
                                 <button
-                                  onClick={() => deleteExercise(exercise.id, day.id)}
+                                  onClick={() =>
+                                    deleteExercise(exercise.id, day.id)
+                                  }
                                   className="p-1 text-gray-500 hover:text-red-600 transition-colors"
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -652,41 +797,76 @@ export default function DashboardPage() {
                         <input
                           type="text"
                           value={newExercise.name}
-                          onChange={(e) => setNewExercise({...newExercise, name: e.target.value})}
+                          onChange={(e) =>
+                            setNewExercise({
+                              ...newExercise,
+                              name: e.target.value,
+                            })
+                          }
                           placeholder="Nombre del ejercicio"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         <div className="flex gap-2">
                           <div className="flex flex-col w-1/3">
-                            <label htmlFor="sets" className="text-xs text-gray-500 mb-1">Sets</label>
+                            <label
+                              htmlFor="sets"
+                              className="text-xs text-gray-500 mb-1"
+                            >
+                              Sets
+                            </label>
                             <input
                               id="sets"
                               type="number"
                               value={newExercise.sets}
-                              onChange={(e) => setNewExercise({...newExercise, sets: parseInt(e.target.value) || 0})}
+                              onChange={(e) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  sets: parseInt(e.target.value) || 0,
+                                })
+                              }
                               placeholder="Sets"
                               min="1"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div className="flex flex-col w-1/3">
-                            <label htmlFor="reps" className="text-xs text-gray-500 mb-1">Reps</label>
+                            <label
+                              htmlFor="reps"
+                              className="text-xs text-gray-500 mb-1"
+                            >
+                              Reps
+                            </label>
                             <input
                               id="reps"
                               type="text"
                               value={newExercise.reps}
-                              onChange={(e) => setNewExercise({...newExercise, reps: e.target.value})}
+                              onChange={(e) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  reps: e.target.value,
+                                })
+                              }
                               placeholder="Reps (ej: 12, 8-10)"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div className="flex flex-col w-1/3">
-                            <label htmlFor="weight" className="text-xs text-gray-500 mb-1">Peso (kg)</label>
+                            <label
+                              htmlFor="weight"
+                              className="text-xs text-gray-500 mb-1"
+                            >
+                              Peso (kg)
+                            </label>
                             <input
                               id="weight"
                               type="number"
                               value={newExercise.weight}
-                              onChange={(e) => setNewExercise({...newExercise, weight: parseFloat(e.target.value) || 0})}
+                              onChange={(e) =>
+                                setNewExercise({
+                                  ...newExercise,
+                                  weight: parseFloat(e.target.value) || 0,
+                                })
+                              }
                               placeholder="Peso"
                               min="0"
                               step="0.5"
@@ -704,7 +884,7 @@ export default function DashboardPage() {
                           <button
                             onClick={() => {
                               setShowAddExercise(null);
-                              setNewExercise({ name: '', sets: 3, reps: '12' });
+                              setNewExercise({ name: "", sets: 3, reps: "12" });
                             }}
                             className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-400 transition-colors"
                           >
