@@ -20,6 +20,7 @@ interface Exercise {
   sets: number;
   reps: string;
   order_index: number;
+  weight?: number;
 }
 
 interface TrainingDay {
@@ -51,13 +52,15 @@ export default function DashboardPage() {
   const [newExercise, setNewExercise] = useState({
     name: '',
     sets: 3,
-    reps: '12'
+    reps: '12',
+    weight: 0
   });
   const [editDayName, setEditDayName] = useState('');
   const [editExerciseData, setEditExerciseData] = useState({
     name: '',
     sets: 3,
-    reps: '12'
+    reps: '12',
+    weight: 0
   });
   
   const router = useRouter();
@@ -260,6 +263,7 @@ export default function DashboardPage() {
           name: newExercise.name.trim(),
           sets: newExercise.sets,
           reps: newExercise.reps,
+          weight: newExercise.weight,
           order_index: day?.exercises.length || 0
         })
         .select()
@@ -267,12 +271,27 @@ export default function DashboardPage() {
 
       if (error) throw error;
 
+      // Si hay un peso, guardarlo en progress_history
+      if (newExercise.weight > 0 && data) {
+        const { error: progressError } = await supabase
+          .from('progress_history')
+          .insert({
+            exercise_id: data.id,
+            weight: newExercise.weight,
+            notes: 'Peso inicial'
+          });
+        
+        if (progressError) {
+          console.error('Error guardando el peso:', progressError);
+        }
+      }
+
       setTrainingDays(trainingDays.map(day => 
         day.id === dayId 
           ? { ...day, exercises: [...day.exercises, data] }
           : day
       ));
-      setNewExercise({ name: '', sets: 3, reps: '12' });
+      setNewExercise({ name: '', sets: 3, reps: '12', weight: 0 });
       setShowAddExercise(null);
     } catch (error) {
       console.error('Error adding exercise:', error);
@@ -288,11 +307,27 @@ export default function DashboardPage() {
         .update({
           name: editExerciseData.name.trim(),
           sets: editExerciseData.sets,
-          reps: editExerciseData.reps
+          reps: editExerciseData.reps,
+          weight: editExerciseData.weight
         })
         .eq('id', exerciseId);
 
       if (error) throw error;
+
+      // Si hay un peso, guardarlo en progress_history
+      if (editExerciseData.weight > 0) {
+        const { error: progressError } = await supabase
+          .from('progress_history')
+          .insert({
+            exercise_id: exerciseId,
+            weight: editExerciseData.weight,
+            notes: 'Actualización de peso'
+          });
+        
+        if (progressError) {
+          console.error('Error guardando el peso:', progressError);
+        }
+      }
 
       setTrainingDays(trainingDays.map(day => 
         day.id === dayId 
@@ -307,7 +342,7 @@ export default function DashboardPage() {
           : day
       ));
       setEditingExercise(null);
-      setEditExerciseData({ name: '', sets: 3, reps: '12' });
+      setEditExerciseData({ name: '', sets: 3, reps: '12', weight: 0 });
     } catch (error) {
       console.error('Error updating exercise:', error);
     }
@@ -509,21 +544,42 @@ export default function DashboardPage() {
                                 placeholder="Nombre del ejercicio"
                               />
                               <div className="flex gap-2">
-                                <input
-                                  type="number"
-                                  value={editExerciseData.sets}
-                                  onChange={(e) => setEditExerciseData({...editExerciseData, sets: parseInt(e.target.value) || 0})}
-                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                                  placeholder="Sets"
-                                  min="1"
-                                />
-                                <input
-                                  type="text"
-                                  value={editExerciseData.reps}
-                                  onChange={(e) => setEditExerciseData({...editExerciseData, reps: e.target.value})}
-                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                  placeholder="Reps"
-                                />
+                                <div className="flex flex-col w-1/3">
+                                  <label htmlFor="edit-sets" className="text-xs text-gray-500 mb-1">Sets</label>
+                                  <input
+                                    id="edit-sets"
+                                    type="number"
+                                    value={editExerciseData.sets}
+                                    onChange={(e) => setEditExerciseData({...editExerciseData, sets: parseInt(e.target.value) || 0})}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder="Sets"
+                                    min="1"
+                                  />
+                                </div>
+                                <div className="flex flex-col w-1/3">
+                                  <label htmlFor="edit-reps" className="text-xs text-gray-500 mb-1">Reps</label>
+                                  <input
+                                    id="edit-reps"
+                                    type="text"
+                                    value={editExerciseData.reps}
+                                    onChange={(e) => setEditExerciseData({...editExerciseData, reps: e.target.value})}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder="Reps"
+                                  />
+                                </div>
+                                <div className="flex flex-col w-1/3">
+                                  <label htmlFor="edit-weight" className="text-xs text-gray-500 mb-1">Peso (kg)</label>
+                                  <input
+                                    id="edit-weight"
+                                    type="number"
+                                    value={editExerciseData.weight}
+                                    onChange={(e) => setEditExerciseData({...editExerciseData, weight: parseFloat(e.target.value) || 0})}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder="Peso"
+                                    min="0"
+                                    step="0.5"
+                                  />
+                                </div>
                               </div>
                               <div className="flex gap-2">
                                 <button
@@ -535,7 +591,7 @@ export default function DashboardPage() {
                                 <button
                                   onClick={() => {
                                     setEditingExercise(null);
-                                    setEditExerciseData({ name: '', sets: 3, reps: '12' });
+                                    setEditExerciseData({ name: '', sets: 3, reps: '12', weight: 0 });
                                   }}
                                   className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
                                 >
@@ -552,6 +608,12 @@ export default function DashboardPage() {
                                   <span>{exercise.sets} sets</span>
                                   <Target className="h-3 w-3 ml-3 mr-1" />
                                   <span>{exercise.reps} reps</span>
+                                  {exercise.weight > 0 && (
+                                    <>
+                                      <Dumbbell className="h-3 w-3 ml-3 mr-1" />
+                                      <span>{exercise.weight} kg</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex gap-1 ml-2">
@@ -561,7 +623,8 @@ export default function DashboardPage() {
                                     setEditExerciseData({
                                       name: exercise.name,
                                       sets: exercise.sets,
-                                      reps: exercise.reps
+                                      reps: exercise.reps,
+                                      weight: exercise.weight || 0
                                     });
                                   }}
                                   className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
@@ -591,24 +654,45 @@ export default function DashboardPage() {
                           value={newExercise.name}
                           onChange={(e) => setNewExercise({...newExercise, name: e.target.value})}
                           placeholder="Nombre del ejercicio"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={newExercise.sets}
-                            onChange={(e) => setNewExercise({...newExercise, sets: parseInt(e.target.value) || 0})}
-                            placeholder="Sets"
-                            className="w-20 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            min="1"
-                          />
-                          <input
-                            type="text"
-                            value={newExercise.reps}
-                            onChange={(e) => setNewExercise({...newExercise, reps: e.target.value})}
-                            placeholder="Reps (ej: 12, 8-10)"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          <div className="flex flex-col w-1/3">
+                            <label htmlFor="sets" className="text-xs text-gray-500 mb-1">Sets</label>
+                            <input
+                              id="sets"
+                              type="number"
+                              value={newExercise.sets}
+                              onChange={(e) => setNewExercise({...newExercise, sets: parseInt(e.target.value) || 0})}
+                              placeholder="Sets"
+                              min="1"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex flex-col w-1/3">
+                            <label htmlFor="reps" className="text-xs text-gray-500 mb-1">Reps</label>
+                            <input
+                              id="reps"
+                              type="text"
+                              value={newExercise.reps}
+                              onChange={(e) => setNewExercise({...newExercise, reps: e.target.value})}
+                              placeholder="Reps (ej: 12, 8-10)"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex flex-col w-1/3">
+                            <label htmlFor="weight" className="text-xs text-gray-500 mb-1">Peso (kg)</label>
+                            <input
+                              id="weight"
+                              type="number"
+                              value={newExercise.weight}
+                              onChange={(e) => setNewExercise({...newExercise, weight: parseFloat(e.target.value) || 0})}
+                              placeholder="Peso"
+                              min="0"
+                              step="0.5"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <button
